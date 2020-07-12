@@ -1,10 +1,15 @@
 
-#include <stdint.h>
+#include "header.h"
 
-void outb(unsigned short, unsigned char);
-void outw(unsigned short, unsigned short);
-uint16_t inw(unsigned short);
-uint8_t inb(unsigned short);
+//floppy		https://blog.csdn.net/judyge/article/details/52289104
+
+//harddisk		https://blog.csdn.net/fjlq1994/article/details/49472827
+
+// mouse		
+
+// keyboard		https://www.jianshu.com/p/b45b36261274
+
+// vga			https://blog.csdn.net/qq_39148922/article/details/85005271
 
 int ReadDisk(unsigned lba, unsigned nsec, char *p, int limit)
 {

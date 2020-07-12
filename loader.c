@@ -1,22 +1,18 @@
 
+#include "header.h"
 
-const char msg[] = "Entering loader_main!                                                                                                                                                           ";
-
-void display_message()
-{
-	unsigned short *p =(unsigned short *)0xb8000;
-	for (int i = 0; i < sizeof(msg); i++)
-	{
-		*p++ = 0xd00 | msg[i];
-	}
-}
-
-void setup_idt();
+int test_idt(int);
 
 void loader_main()
 {
-	display_message();
+	printf("Enter loader_main @0x%x == %x\n", loader_main, printf );
 	setup_idt();
+	printf("IDT OK\n");
+	test_idt(0);
+	printf("test IDT OK\n");
+	
+	setup_gdt();
+	while (1);
 	return;
 }
 

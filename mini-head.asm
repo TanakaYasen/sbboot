@@ -25,8 +25,8 @@ struc DOS_HEADER
 endstruc
 
 struc FILE_HEADER
-	.Machine:				resw	1               ;-----------------------------说明---------------------------------------------
-	.NumberOfSection:		resw 	1        ;事实上，从这里到e_res2无用部分可以用一句DUP(0)来完成，在这里编译器不会检查
+	.Machine:				resw	1
+	.NumberOfSection:		resw 	1
 	.TimeDateStamp:		resd	1
 	.PointerToSymbolTable: 	resd      1
 	.NumberOfSymbols:		resd      1
@@ -35,8 +35,8 @@ struc FILE_HEADER
 endstruc
 
 struc OPTIONAL_HEADER
-	.Magic:					resw	1               ;-----------------------------说明---------------------------------------------
-	.MajorLinkerVersion:		resb 	1        ;事实上，从这里到e_res2无用部分可以用一句DUP(0)来完成，在这里编译器不会检查
+	.Magic:					resw	1
+	.MajorLinkerVersion:		resb 	1
 	.MinorLinkerVersion:		resb	1
 	.SizeOfCode: 			resd      1
 	.SizeOfInitializedData:	resd      1
@@ -116,11 +116,11 @@ gdt_table_start:
 		
 	gdt_data_flat_idx equ $-gdt_table_start
 	gdt_data_flat:
-		dw 07ffh	;段界限
+		dw 0xffffffff	;段界限
 		dw 0h		;段基地址0-18位
 		db 0h		;段基地址19-23位
 		db 10010010b	;段描述符的第六个字节属性（数据段可读可写）
-		db 11000000b	;段描述符的第七个字节属性
+		db 11001111b	;段描述符的第七个字节属性
 		db 0		;段描述符的最后一个字节，也就是段基地址的第二部分
 		
 	gdt_video_idx equ $-gdt_table_start
@@ -209,6 +209,7 @@ main:
 		add edi,2
 		loop s
 		
+		; enter flat mode
 		mov ax, gdt_data_flat_idx
 		mov ds, ax
 		
