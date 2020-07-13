@@ -1,4 +1,4 @@
-#include <stdint.h>
+#include "header.h"
 
 #define __init
 
@@ -63,21 +63,36 @@ typedef struct GDT_ENTRY {
 
 TSS g_tss;
 
-GDT_ENTRY g_gdt_entries[10] = {0};
-
-uint16_t		lgdt_limit = 10;
-uint32_t		lgdt_entry = (uint32_t)g_gdt_entries;
+GDT_ENTRY g_gdt_entries[7] = {0};
 
 
-static inline void set_gdt(void *e, void *base, int dpl)
+#pragma pack(push)
+#pragma pack(2)
+struct X86_GDT_DESC
 {
+	uint16_t		len;
+	uint32_t		offset;
+}  gdt_desc = {
+	7*sizeof(GDT_ENTRY)-1,
+	(uint32_t)g_gdt_entries
+};
+#pragma pack(pop)
+
+
+
+static inline void set_gdt(void *e, void *base, int type, int dpl)
+{
+	//TYPE = E + ED/C + RW
+	// E=0:data segment	ED=0:UP(data seg), ED=1:DN(stack seg)	W=0:Writeless W=1:Writable
+	// E=0:code segment	C=0:ignore priv C=1:obey priv	R=0: Readless R=1: Readable
+	
 	unsigned addr = (unsigned)base;
 	GDT_ENTRY *entry = (GDT_ENTRY *)e;
 	entry->limit15 = 0xffff;
 	entry->base15 = addr & 0xffff;
 	entry->base23 = (addr >> 16) & 0xff;
 	entry->base31 = (addr >> 24) & 0xff;
-	entry->PDPLSType = 0xC0;
+	entry->PDPLSType = 0x90 | (dpl << 5) | type;
 	entry->GDBAlimit19 = 0xCF;
 	return;
 }
@@ -85,20 +100,25 @@ static inline void set_gdt(void *e, void *base, int dpl)
 
 void setup_gdt()
 {
-	set_gdt(g_gdt_entries + 1, 0, 3);
-	set_gdt(g_gdt_entries + 2, 0, 3);
-	set_gdt(g_gdt_entries + 3, 0, 0);
-	set_gdt(g_gdt_entries + 4, 0, 0);
+	set_gdt(g_gdt_entries + 1, 0, 0xA, 0);
+	set_gdt(g_gdt_entries + 2, 0, 0x2, 0);
+	set_gdt(g_gdt_entries + 3, 0, 0xA, 3);
+	set_gdt(g_gdt_entries + 4, 0, 0x2, 3);
 	
 	g_tss.esp0 = 0x300000;
-	set_gdt(g_gdt_entries + 5, &g_tss, 0);
+	set_gdt(g_gdt_entries + 5, &g_tss, 6, 0);
 	
 	__asm {
-		lgdt 	lgdt_limit
-		mov	ax, 0x10
+		lgdt 	gdt_desc
+		mov	ax, __KERNEL_DS
 		mov	ds, ax
 		mov	es, ax
 		mov	ss, ax
+		push 	__KERNEL_CS
+		push	__switch
+		retf
+__switch:
+		
 	}
 	return;
 }

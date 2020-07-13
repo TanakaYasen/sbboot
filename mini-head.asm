@@ -99,8 +99,8 @@ gdt_table_start:
 	gdt_data_idx equ $-gdt_table_start
 	gdt_data:
 		dw 07ffh	;段界限
-		dw 1h		;段基地址0-18位
-		db 0h		;段基地址19-23位
+		dw 1h		;段基地址0-15位
+		db 0h		;段基地址16-23位
 		db 10010010b	;段描述符的第六个字节属性（数据段可读可写）
 		db 11000000b	;段描述符的第七个字节属性
 		db 0		;段描述符的最后一个字节，也就是段基地址的第二部分

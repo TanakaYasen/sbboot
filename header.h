@@ -1,8 +1,9 @@
 #pragma once
 #include <stdint.h>
 
-void setup_idt();
+void setup_idt_and_test();
 void setup_gdt();
+void setup_idt();
 
 void __cdecl printf(char* format, ...);
 
@@ -12,8 +13,8 @@ uint16_t inw(unsigned short);
 uint8_t inb(unsigned short);
 
 #define __VOID_SS		0x0
-#define __KERNEL_CS	0x10	
-#define __KERNEL_DS	0x18
-#define __USER_CS		(0x20+3)
-#define __USER_DS		(0x28+3)
+#define __KERNEL_CS	0x8
+#define __KERNEL_DS	0x10
+#define __USER_CS		(0x18+3)
+#define __USER_DS		(0x20+3)
 #define __TSS			

@@ -23,6 +23,32 @@ struct X86_IDT_DESC
 };
 #pragma pack(pop)
 
+
+#define SAVE_ALL	\
+__asm {push ebp} \
+__asm { push ebx} \
+__asm { push esi} \
+__asm { push edi } \
+__asm { push ecx } \
+__asm { push edx } \
+__asm { push eax } \
+__asm { push fs } \
+__asm { push ds } \
+__asm { push es } 
+
+#define RESTORE_ALL	\
+__asm { pop es } \
+__asm { pop ds } \
+__asm { pop fs } \
+__asm { pop eax } \
+__asm { pop edx } \
+__asm { pop ecx } \
+__asm { pop edi } \
+__asm { pop esi} \
+__asm { pop ebx} \
+__asm {pop ebp} 
+
+
 /*
 typedef struct _CALL_GATE
 {
@@ -52,7 +78,7 @@ static void _set_gate(void *p, unsigned type, unsigned DPL, void *handler)
 {
 	X86IDT *entry = (X86IDT *)p;
 	entry->high = ((unsigned)handler & 0xffff0000) | 0x8000 | (DPL<<13) | (type <<8);
-	entry->low =  ((unsigned)handler & 0x0000ffff) | (__KERNEL_CS << 16);
+	entry->low =  ((unsigned)handler & 0x0000ffff) | (0x10 << 16);
 	
 	//0x8000=P
 	
@@ -95,81 +121,32 @@ void nmi()
 uint32_t page_fault_addr = 0;
 __declspec (naked) void page_fault()
 {
+	SAVE_ALL
 	__asm {
-		nop
-			nop
-			nop
-		push ebp  
-		push ebx  
-		push esi  
-		push edi  
-		push fs  
-		push ecx  
-		push edx  
-		push ds  
-		push es
-		push eax
 		mov eax, cr2
 		mov page_fault_addr, eax
 	}
 	printf("page fault @%x\n", page_fault_addr);
+	RESTORE_ALL
 	__asm {
-		pop eax
-		pop es
-		pop ds  
-		pop edx  
-		pop ecx  
-		pop fs  
-		pop edi  
-		pop esi  
-		pop ebx  
-		pop ebp  
 		add esp, 4	//skip error_code
 		add [esp], 0xA	//skip	instruction trigger it
-		iretd	//太坑。 iret 0x66CF 与 iretd 0xCF 还是不一样的
-		iret
+		iretd
 	}
 }
 
 __declspec (naked) void double_fault()
 {
-	__asm {
-		nop
-		nop
-		nop
-		xor eax, eax
-	}
 	printf("double fault\n");
 }
 
 __declspec (naked) void int3()
 {
-	__asm {
-		push ebp  
-		push ebx  
-		push esi  
-		push edi  
-		push fs  
-		push ecx  
-		push edx  
-		push ds  
-		push es
-		push eax
-	}
+	SAVE_ALL
 	printf("int 3\n");
+	RESTORE_ALL
 	__asm {
-		pop eax
-		pop es
-		pop ds  
-		pop edx  
-		pop ecx  
-		pop fs  
-		pop edi  
-		pop esi  
-		pop ebx  
-		pop ebp  
-			
-		iretd	//太坑。 iret 与 iretd 还是不一样的
+		iretd	//太坑。 iret 0x66CF 与 iretd 0xCF 还是不一样的
 		iret
 	}
 }
@@ -180,30 +157,11 @@ __declspec (naked) void general_protection()
 	__asm {
 		mov ax, 0x18
 		mov ds, ax;			//fix
-		push ebp  
-		push ebx  
-		push esi  
-		push edi  
-		push fs  
-		push ecx  
-		push edx  
-		push ds  
-		push es
-		push eax
 	}
+	SAVE_ALL
 	printf("general_protection\n");
+	RESTORE_ALL
 	__asm {
-		pop eax
-		pop es
-		pop ds  
-		pop edx  
-		pop ecx  
-		pop fs  
-		pop edi  
-		pop esi  
-		pop ebx  
-		pop ebp  
-			
 		iretd	//太坑。 iret 与 iretd 还是不一样的
 		iret
 	}
@@ -283,7 +241,7 @@ struct pt_regs {
 	int  xss;
 };
 
-void setup_idt()
+void setup_idt_and_test()
 {
 	set_trap_gate(0, &divide_error);
 	set_trap_gate(1, &debug);
@@ -302,26 +260,41 @@ void setup_idt()
 		lidt idt_desc
 	}
 	
-	init_clock();
-	return;
-}
-
-int test_idt(int y)
-{
+	//test
 	__asm {
 		int 3	//test int 3
 	}
 	int *pagefault = (int *) 0xf000A000;
 	*pagefault = 0x233;	
 	
+	/*
 	__asm {
 		mov ax, 0x8
 		mov ds, ax
 		mov eax, 0xf000A000		//如果段检测不过，则会触发 GP#13
 		mov [eax], eax
 	}
+	*/
+	return;
+}
+
+void setup_idt()
+{
+	set_trap_gate(0, &divide_error);
+	set_trap_gate(1, &debug);
+	set_intr_gate(2, &nmi);
+	set_system_gate(3, &int3);
+
+	set_trap_gate(8,	&double_fault);
 	
-	int x = 3;
-	x /= y;
-	return x;
+	set_trap_gate(13,&general_protection);
+	set_trap_gate(14, &page_fault);
+	
+	set_intr_gate(32, &clockirq);
+	set_intr_gate(33, &kbdirq);
+	
+	__asm {
+		lidt idt_desc
+	}
+	return;
 }
