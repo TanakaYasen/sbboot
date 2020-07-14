@@ -1,7 +1,5 @@
 #include "header.h"
 
-void __cdecl printf(char* format, ...);
-
 #define __init
 
 typedef struct _X86IDT {
@@ -18,7 +16,7 @@ struct X86_IDT_DESC
 	uint16_t		len;
 	uint32_t		offset;
 }  idt_desc = {
-	255,
+	255*8-1,
 	(uint32_t)g_idt_table
 };
 #pragma pack(pop)
@@ -244,18 +242,10 @@ struct pt_regs {
 void setup_idt_and_test()
 {
 	set_trap_gate(0, &divide_error);
-	set_trap_gate(1, &debug);
-	set_intr_gate(2, &nmi);
 	set_system_gate(3, &int3);
-
 	set_trap_gate(8,	&double_fault);
-	
 	set_trap_gate(13,&general_protection);
 	set_trap_gate(14, &page_fault);
-	
-	set_intr_gate(32, &clockirq);
-	set_intr_gate(33, &kbdirq);
-	
 	__asm {
 		lidt idt_desc
 	}

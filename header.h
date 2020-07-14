@@ -4,8 +4,9 @@
 void setup_idt_and_test();
 void setup_gdt();
 void setup_idt();
+void demo_graphics(void);
 
-void __cdecl printf(char* format, ...);
+void __cdecl printf(const char* format, ...);
 
 void outb(unsigned short, unsigned char);
 void outw(unsigned short, unsigned short);

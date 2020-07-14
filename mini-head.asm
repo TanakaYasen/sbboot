@@ -1,18 +1,30 @@
+;	detect memory
+;	
 [org 0x0000]
 
+BASE		EQU	0x9000
 LOADAT	EQU	0xA000
+PEBASE		EQU	0x100000
+
+struc ADDR_RANGE_DESC
+	.BaseAddrLow	resd	1
+	.BaseAddrHigh	resd	1
+	.LengthLow		resd	1
+	.LengthHigh		resd	1
+	.Type			resd	1
+endstruc
 
 struc DOS_HEADER
-	.e_magic:	resb	2               ;-----------------------------说明---------------------------------------------
-	.e_cblp:		resw 	1        ;事实上，从这里到e_res2无用部分可以用一句DUP(0)来完成，在这里编译器不会检查
-	.e_cp:		resw	1        ;你结构的定义是否正确，这些变量名也是没有意义的，这样写只是有利于我们认识
-	.e_crlc:		resw      1        ;PE结构而已，除了关键字，你可以任意写，因为它相当于写二进制型汇编代码
-	.e_cparhdr:	resw      1        ;事实上，和直接写二进制是一样一样的，只是这样就轻松多了。当然了，
-	.e_minalloc:	resw	1        ;这种方式的定义给我们带来的问题就是重定位，所以需要重定位的地方要小心了,
-	.e_maxalloc:	resw 	1        ;你也可以把PE头部提上来到DOS头部里面来变形PE头，或者整个最小PE什么的，
-	.e_ss:		resw	1        ;随你怎么高兴怎么玩，但是要保证e_lfanew定位的正确，你想怎么来就怎么来，你自由了！
-	.e_sp:		resw	1        ;但是，没有绝对的自由，俗话说得好，任悟空本领再高，他也跳不出如来佛(OS)的手掌心啊
-	.e_csum:	resw	1        ;------------------------------------------------------------------------------
+	.e_magic:	resb	2
+	.e_cblp:		resw 	1
+	.e_cp:		resw	1
+	.e_crlc:		resw      1
+	.e_cparhdr:	resw      1
+	.e_minalloc:	resw	1
+	.e_maxalloc:	resw 	1
+	.e_ss:		resw	1
+	.e_sp:		resw	1
+	.e_csum:	resw	1
 	.e_ip:		resw	1
 	.e_cs:		resw	1
 	.e_lfarlc:		resw	1
@@ -53,12 +65,12 @@ struc OPTIONAL_HEADER
 	.MajorImageVersion:			resw 	1
 	.MinorImageVersion:			resw 	1
 	
-	.Reserved1:				resd 	1
-	.SizeOfImage:			resd 	1
-	.SizeOfHeaders:				resd 	1
-	.CheckSum:				resd 	1
-	.Subsystem:				resw 	1
-	.DllCharacteristics:		resw 	1
+	.Reserved1:						resd 	1
+	.SizeOfImage:					resd 	1
+	.SizeOfHeaders:					resd 	1
+	.CheckSum:						resd 	1
+	.Subsystem:						resw 	1
+	.DllCharacteristics:				resw 	1
 	.SizeOfStackReserve:				resd 	1
 	.SizeOfStackCommit:			resd 	1
 	.SizeOfHeapReserve:				resd 	1
@@ -74,19 +86,19 @@ struc NT_HEADER
 endstruc
 
 struc SECTION_HEADER
-    .Name 		resb	8
-    .Misc			resd	1
-    .VirtualAddress	resd	1
-    .SizeOfRawData	resd	1
-    .PointerToRawData resd	1
-    .PointerToRelocations	resd	1
-    .PointerToLinenumbers	resd	1
-    .NumberOfRelocations	resw	1
-    .NumberOfLinenumbers	resw	1
-    .Characteristics			resd	1
+	.Name 					resb	8
+	.Misc						resd	1
+	.VirtualAddress			resd	1
+	.SizeOfRawData			resd	1
+	.PointerToRawData 		resd	1
+	.PointerToRelocations		resd	1
+	.PointerToLinenumbers	resd	1
+	.NumberOfRelocations	resw	1
+	.NumberOfLinenumbers	resw	1
+	.Characteristics			resd	1
 endstruc
 
-BASE equ 0x9000
+BEGIN:
 	jmp main
 
 align 8			; I GUESS:	8-bytes alignment donates better performance
@@ -116,7 +128,7 @@ gdt_table_start:
 		
 	gdt_data_flat_idx equ $-gdt_table_start
 	gdt_data_flat:
-		dw 0xffffffff	;段界限
+		dw 07ffh	;段界限
 		dw 0h		;段基地址0-18位
 		db 0h		;段基地址19-23位
 		db 10010010b	;段描述符的第六个字节属性（数据段可读可写）
@@ -139,32 +151,103 @@ gdtr_addr:								;6 Bytes
 	
 
 main:
-	xor eax, eax				;初始化数据段描述符的基地址
-	mov eax, BASE
-	mov word [gdt_data+2],ax
-	shr eax,16
-	mov byte [gdt_data+4],al
-	mov byte [gdt_data+7],ah
+	;ds == 0x900
+	call		disk_load_PE
+	call		probe_memory
+	
+	xor		eax, eax				;初始化数据段描述符的基地址
+	mov	eax, BASE
+	mov	word [gdt_data+2], ax
+	shr		eax, 16
+	mov	byte [gdt_data+4], al
+	mov	byte [gdt_data+7], ah
 	
 	cli
-	lgdt [gdtr_addr]			;让cpu读取gdtr_addr所指向内存内容
+	lgdt	[gdtr_addr]			;让cpu读取gdtr_addr所指向内存内容
 
-;	enable_A20:				;A20地址线开启, 不开也没问题 92h本来就是开的
+;	enable_A20:					;A20地址线开启, 不开也没问题 92h本来就是开的
 		in al,92h
 		or al,00000010b
 		out 92h,al
 
 	; 在此之前测试 一下这个
 	
-;	enter_pmode:			;进入保护模式
-		mov eax, cr0
-		or eax, 1
-		mov cr0, eax		;此时已经是保护模式了
+;	enter_pmode:
+		mov	eax, cr0
+		or		eax, 1		; CR0.PE = 1
+		mov	cr0, eax		;此时已经是保护模式了
 		
 		;mov ax, gdt_data_flat_idx; mov ds, ax ;mov eax, 0x100001; mov byte [eax], 22h; 	ds base,limit都设好了
+		jmp		gdt_code_idx:code_32+BASE
+
+; http://ftp.lip6.fr/pub/mach/mach4/multiboot/mem64mb.html
+probe_memory:
+		;here ds is 0x900h
+		mov	ah,	88h
+		int 		15h
+		mov	[MemAbove1K], ax
 		
-		;跳转到保护模式中
-		jmp gdt_code_idx:code_32+BASE
+		mov	ax, 0xE801
+		int		15h
+		mov	[MemLargeConfigurationsAX], ax
+		mov	[MemLargeConfigurationsBX], bx
+		mov	[MemLargeConfigurationsCX], cx
+		mov	[MemLargeConfigurationsDX], dx
+		
+		xor		ebx, ebx
+		mov	ax, BASE >> 4
+		mov	es, ax
+		mov	di,	MemOverview
+detect_iter:
+		mov	edx, 'SMAP'
+		mov	ecx, ADDR_RANGE_DESC_size
+		mov	eax, 0xE820
+		int		15h
+		jc		detect_ok
+		add		di, ADDR_RANGE_DESC_size
+		inc		word [nRanges]
+		jmp		detect_iter
+		
+detect_ok:
+		ret
+
+
+;#define FLOPPY_144_SECTORS_PER_TRACK 18
+;void lba_2_chs(uint32_t lba, uint16_t* cyl, uint16_t* head, uint16_t* sector)
+;{
+;    *cyl    = lba / (2 * FLOPPY_144_SECTORS_PER_TRACK);
+;    *head   = ((lba % (2 * FLOPPY_144_SECTORS_PER_TRACK)) / FLOPPY_144_SECTORS_PER_TRACK);
+;    *sector = ((lba % (2 * FLOPPY_144_SECTORS_PER_TRACK)) % FLOPPY_144_SECTORS_PER_TRACK + 1);
+;}
+disk_load_PE:
+		mov bx, LOADAT  ; 把磁盘指定扇区中的数据加载内存中的 0x0000(ES):0x9000(BX) 处
+		mov ah, 0x02    ; BIOS 读取扇区的方法
+		mov al, 11h       ; 读取 17个扇区
+		mov ch, 0x00    ; CHS 中的 cylinder 为 0
+		mov cl, 0x04    ; 从第 4 个扇区开始读（即接在 bootsect 后面的扇区）
+		mov dl, 0x00
+		mov dh, 0x00    ; CHS 中的 head 为 0
+		int 0x13        ; 使用 BIOS 13 号中断开始从磁盘读数据到内存
+
+		jc disk_error   ; 中断调用时会设置 carry flag，如果未设置，则发生了错误
+		mov bl, 11h
+		cmp bl, al      ; BIOS 在读取时会把真正读取到的扇区数赋给 al
+		jne disk_error  ; 如果 al 不为 2，则说明读取发生了错误
+		ret	
+disk_error:
+		hlt
+	
+MemAbove1K					dw	0
+MemLargeConfigurationsAX		dw	0
+MemLargeConfigurationsBX		dw	0
+MemLargeConfigurationsCX		dw	0
+MemLargeConfigurationsDX		dw	0
+nRanges						dw	0
+MemOverview					times 256	db	0
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+
 
 [BITS 32]
 	;在保护模式中打印字符
@@ -271,64 +354,79 @@ paging:
 		; x /4098b 0xf0009000
 		; bx_dbg_read_linear: physical address not available for linear 0x00000000f000a000
 		
-		; load PE@ 0x100000
+		; load 	PE@ 0x100000
+		; 
+		mov	esi, LOADAT										;esi = base
+		mov 	dx, [esi]
+		cmp	dx, 'MZ'
+		jne		load_pe_error
 		
-		; get EntryPoint
-		mov esi, LOADAT										;esi = base
-		mov edi, [esi + DOS_HEADER.e_lfanew]					;
-		add edi, LOADAT										;edi = ntheader
-		mov edx, [edi+NT_HEADER.Signature]					;Sig; 0x4550
+		mov	edi, [esi + DOS_HEADER.e_lfanew]				;
+		add		edi, LOADAT									;edi = ntheader
+		mov	edx, [edi+NT_HEADER.Signature]					;Sig; 0x4550
+		
+		cmp	edx, 0x4550
+		jne		load_pe_error
+		
+		;;set up es for memcpy of section locationing
+		mov	ax, ds
+		mov	es, ax
+		; first section
+		lea		eax, [edi+NT_HEADER.FileHeader + FILE_HEADER.NumberOfSection]
+		movzx	ecx, word [eax]
+		lea		eax, [edi +NT_HEADER.FileHeader + FILE_HEADER.SizeOfOptionalHeader]
+		movzx	edx, word [eax]
+		
+		lea		ebx, [edi + 4+FILE_HEADER_size]
+		add		ebx, edx
 
-		; first section		
-		lea eax, [edi+NT_HEADER.FileHeader + FILE_HEADER.NumberOfSection]
-		mov cx, [eax]
-		lea eax, [edi +NT_HEADER.FileHeader + FILE_HEADER.SizeOfOptionalHeader]
-		mov dx, [eax]
+LocateSections:
+		push 	ecx
 		
-		mov ebx, edi
-		add ebx, 4+FILE_HEADER_size
-		add ebx, edx
+		mov	edx,	[ebx+SECTION_HEADER.PointerToRawData]		;
+		add		edx,	LOADAT										;foa as source
+		mov	eax,	[ebx+SECTION_HEADER.VirtualAddress]			;rva
+		add		eax,	PEBASE											;va as dest
+		mov	ecx, 	[ebx+SECTION_HEADER.Misc]					;section size
+		
+		call		memcpy
+		call		dump_section
+		add 	ebx,	SECTION_HEADER_size
+		
+		pop	ecx
+		loop	LocateSections
+		
+;Get EntryPoint
+		lea 		eax, [edi+NT_HEADER.OptionalHeader + OPTIONAL_HEADER.AddressOfEntryPoint]
+		mov	eax, [eax]
+		add		eax, PEBASE
+		
+;setup esp and jmp
+ 		mov	dx, gdt_data_flat_idx
+		mov	ss, dx
+		mov	esp, 0x200000
+		mov	ecx,	MemAbove1K + BASE
+		jmp 	eax
 
-LocateSection:
-		push ecx
+load_pe_error:
 		
-		mov eax,	[ebx+SECTION_HEADER.PointerToRawData]
-		add eax,	LOADAT
-		mov edx,	[ebx+SECTION_HEADER.VirtualAddress]
-		add edx,	0x100000
-		mov ecx, 	[ebx+SECTION_HEADER.Misc]
-		
-		call	copy_data
-		add ebx,	SECTION_HEADER_size
-		
-		pop ecx
-		loop LocateSection
-		
-		
-		lea eax, [edi+NT_HEADER.OptionalHeader + OPTIONAL_HEADER.AddressOfEntryPoint]
-		mov eax, [eax]
-		add eax, 0x100000
-		
-		;set up esp and jmp
- 		mov dx, gdt_data_flat_idx
-		mov ss, dx
-		mov esp, 0x200000
-		
-		jmp eax
-		
-copy_data:
-		push esi
-		push edi
-		
-		mov	esi,	eax
-		mov	edi,	edx
-sss:
-		mov al, [esi]
-		mov [edi], al 
-		inc esi
-		inc edi
-		loop sss
-		
-		pop edi
-		pop esi
+; ecx = count,	eax = dest, edx =source;
+memcpy:
+		push	esi
+		push	edi
+		mov	edi, eax
+		mov    	esi, edx
+		push  	ecx
+		shr    	ecx, 0x2
+		rep		movsd
+		pop	ecx
+		and		ecx, 0x3
+		rep 	movsb
+		pop    	edi
+		pop    	esi
 		ret
+		
+dump_section:
+		
+		ret
+times 1024-($-$$) 			nop
