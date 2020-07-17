@@ -45,7 +45,12 @@ void __fastcall loader_main(const MEM_INFO *m_info)
 	printf("GDT Reset OK\n");
 	setup_idt();
 	printf("VGA test\n");
-	while (1);
+	while (1)
+	{
+		static int ii = 0;
+		__asm { hlt };
+		printf("==============%d\n", ++ii);
+	}
 	demo_graphics();
 	return;
 }

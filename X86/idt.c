@@ -2,6 +2,13 @@
 
 #define __init
 
+#define _OLD_KERNRL_CS			0x10
+
+#define _MASTE_PIC_COMMAND	0x20
+#define _MASTE_PIC_DATA			0x21
+#define _SLAVE_PIC_COMMAND		0xA0
+#define _SLAVE_PIC_DATA			0xA1
+
 typedef struct _X86IDT {
 	uint32_t		low;
 	uint32_t		high;
@@ -72,14 +79,14 @@ typedef struct _INT_GATE
 	USHORT OffsetHigh;
 }INT_GATE,*INT_GATE;
 */
+
+static unsigned short	__IDT_CS__;
+
 static void _set_gate(void *p, unsigned type, unsigned DPL, void *handler)
 {
 	X86IDT *entry = (X86IDT *)p;
 	entry->high = ((unsigned)handler & 0xffff0000) | 0x8000 | (DPL<<13) | (type <<8);
-	entry->low =  ((unsigned)handler & 0x0000ffff) | (0x10 << 16);
-	
-	//0x8000=P
-	
+	entry->low =  ((unsigned)handler & 0x0000ffff) | (__IDT_CS__ << 16);
 }
 
 //difference between 
@@ -103,6 +110,81 @@ static void __init set_call_gate(void *a, void *addr)
 	_set_gate(g_idt_table,12,3,addr);
 }
 
+
+uint32_t page_fault_addr = 0;
+__declspec (naked) void _test_page_fault()
+{
+	SAVE_ALL
+	__asm {
+		mov eax, cr2
+		mov page_fault_addr, eax
+	}
+	printf("page fault @%x\n", page_fault_addr);
+	RESTORE_ALL
+	__asm {
+		add esp, 4	//skip error_code
+		add [esp], 0xA	//skip	instruction trigger it
+		iretd
+	}
+}
+
+__declspec (naked) void _test_int3()
+{
+	SAVE_ALL
+	printf("int 3\n");
+	RESTORE_ALL
+	__asm {
+		iretd	//太坑。 iret 0x66CF 与 iretd 0xCF 还是不一样的
+		iret
+	}
+}
+
+__declspec (naked) void _test_general_protection()
+{
+	
+	__asm {
+		mov ax, 0x18
+		mov ds, ax;			//fix
+	}
+	SAVE_ALL
+	printf("general_protection\n");
+	RESTORE_ALL
+	__asm {
+		iretd	//太坑。 iret 与 iretd 还是不一样的
+		iret
+	}
+}
+
+void setup_idt_and_test()
+{
+	__IDT_CS__ = _OLD_KERNRL_CS;
+	set_system_gate(3, 	&_test_int3);
+	set_trap_gate(13,	&_test_general_protection);
+	set_trap_gate(14, 	&_test_page_fault);
+	__asm {
+		lidt idt_desc
+	}
+	
+	//test
+	__asm {
+		int 3	//test int 3
+	}
+	int *pagefault = (int *) 0xf000A000;
+	*pagefault = 0x233;	
+	
+	/*
+	__asm {
+		mov ax, 0x8
+		mov ds, ax
+		mov eax, 0xf000A000		//如果段检测不过，则会触发 GP#13
+		mov [eax], eax
+	}
+	*/
+	return;
+}
+
+
+
 void divide_error()
 {
 
@@ -116,7 +198,6 @@ void nmi()
 {
 }
 
-uint32_t page_fault_addr = 0;
 __declspec (naked) void page_fault()
 {
 	SAVE_ALL
@@ -160,32 +241,87 @@ __declspec (naked) void general_protection()
 	printf("general_protection\n");
 	RESTORE_ALL
 	__asm {
-		iretd	//太坑。 iret 与 iretd 还是不一样的
-		iret
+		iretd
 	}
 }
 
-void kbdirq()
+__declspec (naked) void clockirq()
 {
-	
+	static int clock_count;
+	SAVE_ALL
+	printf("clock irq %d\n", clock_count++);
+	RESTORE_ALL
+	__asm {
+		;sti
+		iretd
+	}
 }
 
-void clockirq()
+__declspec (naked) void kbdirq()
 {
-	printf("clock\n");
+	SAVE_ALL
+	printf("kbdirq\n");
+	RESTORE_ALL
+	__asm {
+		sti
+		iretd
+	}
 }
-	
+
+__declspec (naked) void common_irq()
+{
+	static int irq_count;
+	SAVE_ALL
+	printf("common irq %d\n", irq_count++);
+	RESTORE_ALL
+	__asm {
+		sti
+		iretd
+	}
+}
+
+inline void send_eoi(void)
+{
+     /* Send EOI to both master and slave */
+    outb( 0x20, 0x20 ); /* master PIC */
+    outb( 0x20, 0xA0 ); /* slave PIC */
+}
+
 #define HZ 100
 #define CLOCK_TICK_RATE    1193180    /* 图5.3中的输入脉冲 */
 #define LATCH  ((CLOCK_TICK_RATE + HZ/2) / HZ)  /* 计数器0的计数初值 */
 
 void init_clock()
 {
-	outb(0x34,0x43);     				/* 写计数器0的控制字：工作方式2*/
+	outb(0x34, 0x43);     				/* 写计数器0的控制字：工作方式2*/
  	outb(LATCH & 0xff , 0x40); 		  /* 写计数初值LSB  计数初值低位字节*/  
 	outb(LATCH >> 8 , 0x40);  		 /* 写计数初值MSB 计数初值高位字节*/
 }
 
+//https://wiki.osdev.org/8259_PIC
+//https://docs.huihoo.com/gnu_linux/own_os/interrupt-8259_5.htm
+
+
+void init_8259_pic()
+{
+	unsigned char a1, a2;
+	
+	a1 = inb(_MASTE_PIC_DATA);                        // save masks
+	a2 = inb(_SLAVE_PIC_DATA);
+ 
+	outb(_MASTE_PIC_COMMAND, 0x11);  // starts the initialization sequence (in cascade mode)
+	outb(_SLAVE_PIC_COMMAND, 0x11);
+	
+	outb(_MASTE_PIC_DATA, 	0x20);                 // ICW2: Master PIC vector offset
+	outb(_SLAVE_PIC_DATA, 		0x28);                 // ICW2: Slave PIC vector offset
+	outb(_MASTE_PIC_DATA, 	4);                       // ICW3: tell Master PIC that there is a slave PIC at IRQ2 (0000 0100)
+	outb(_SLAVE_PIC_DATA, 		2);                       // ICW3: tell Slave PIC its cascade identity (0000 0010)
+	outb(_MASTE_PIC_DATA,		0x03);			//ICW4
+	outb(_SLAVE_PIC_DATA,		0x03);			//ICW4
+ 
+	outb(_MASTE_PIC_DATA, a1);   // restore saved masks.
+	outb(_SLAVE_PIC_DATA, a2);
+}
 
 typedef struct TSS {
     uint32_t link; // 保存前一个 TSS 段选择子，使用 call 指令切换寄存器的时候由CPU填写。
@@ -239,37 +375,10 @@ struct pt_regs {
 	int  xss;
 };
 
-void setup_idt_and_test()
-{
-	set_trap_gate(0, &divide_error);
-	set_system_gate(3, &int3);
-	set_trap_gate(8,	&double_fault);
-	set_trap_gate(13,&general_protection);
-	set_trap_gate(14, &page_fault);
-	__asm {
-		lidt idt_desc
-	}
-	
-	//test
-	__asm {
-		int 3	//test int 3
-	}
-	int *pagefault = (int *) 0xf000A000;
-	*pagefault = 0x233;	
-	
-	/*
-	__asm {
-		mov ax, 0x8
-		mov ds, ax
-		mov eax, 0xf000A000		//如果段检测不过，则会触发 GP#13
-		mov [eax], eax
-	}
-	*/
-	return;
-}
-
 void setup_idt()
 {
+	__IDT_CS__ = __KERNEL_CS;
+	
 	set_trap_gate(0, &divide_error);
 	set_trap_gate(1, &debug);
 	set_intr_gate(2, &nmi);
@@ -280,11 +389,23 @@ void setup_idt()
 	set_trap_gate(13,&general_protection);
 	set_trap_gate(14, &page_fault);
 	
-	set_intr_gate(32, &clockirq);
-	set_intr_gate(33, &kbdirq);
+	set_intr_gate(0x20, &clockirq);
+	set_intr_gate(0x21, &kbdirq);
+	
+	for (int i = 0x22; i < 0xff; i++)
+	{
+		set_intr_gate(i, &common_irq);
+	}
 	
 	__asm {
 		lidt idt_desc
+	}
+	
+	init_8259_pic();
+	init_clock();
+	//
+	__asm {
+		sti
 	}
 	return;
 }
