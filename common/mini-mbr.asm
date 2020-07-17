@@ -3,8 +3,6 @@
 	jmp main
 %include "print.asm"
 
-section.acc.start
-
 main:
 	mov ax, cs
 	mov ds, ax
