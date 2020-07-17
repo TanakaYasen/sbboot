@@ -141,7 +141,6 @@ __declspec (naked) void _test_int3()
 
 __declspec (naked) void _test_general_protection()
 {
-	
 	__asm {
 		mov ax, 0x18
 		mov ds, ax;			//fix
@@ -216,7 +215,13 @@ __declspec (naked) void page_fault()
 
 __declspec (naked) void double_fault()
 {
+	SAVE_ALL
 	printf("double fault\n");
+	RESTORE_ALL
+	__asm {
+		add esp, 4	//skip error_code
+		iretd
+	}
 }
 
 __declspec (naked) void int3()
@@ -249,18 +254,20 @@ __declspec (naked) void clockirq()
 {
 	static int clock_count;
 	SAVE_ALL
-	printf("clock irq %d\n", clock_count++);
+	//printf("clock irq %d\n", clock_count++);
+	//__asm {sti}	; 	//开中断
+	//while (1);		//再循环才能被中断
 	RESTORE_ALL
 	__asm {
-		;sti
-		iretd
+		sti			//not need.
+		iretd		//this would recover eflag and thus, IF will be reset.
 	}
 }
 
 __declspec (naked) void kbdirq()
 {
 	SAVE_ALL
-	printf("kbdirq\n");
+	printf("kbdirq %d\n", inb(0x60));
 	RESTORE_ALL
 	__asm {
 		sti
@@ -316,43 +323,43 @@ void init_8259_pic()
 	outb(_SLAVE_PIC_DATA, 		0x28);                 // ICW2: Slave PIC vector offset
 	outb(_MASTE_PIC_DATA, 	4);                       // ICW3: tell Master PIC that there is a slave PIC at IRQ2 (0000 0100)
 	outb(_SLAVE_PIC_DATA, 		2);                       // ICW3: tell Slave PIC its cascade identity (0000 0010)
-	outb(_MASTE_PIC_DATA,		0x03);			//ICW4
-	outb(_SLAVE_PIC_DATA,		0x03);			//ICW4
+	outb(_MASTE_PIC_DATA,		0x03);			//ICW4		auto send EOI
+	outb(_SLAVE_PIC_DATA,		0x03);			//ICW4		auto send EOI
  
-	outb(_MASTE_PIC_DATA, a1);   // restore saved masks.
-	outb(_SLAVE_PIC_DATA, a2);
+	outb(_MASTE_PIC_DATA,		a1);   		// restore saved masks.
+	outb(_SLAVE_PIC_DATA,		a2);
 }
 
 typedef struct TSS {
-    uint32_t link; // 保存前一个 TSS 段选择子，使用 call 指令切换寄存器的时候由CPU填写。
-    // 这 6 个值是固定不变的，用于提权，CPU 切换栈的时候用
-    uint32_t esp0; // 保存 0 环栈指针
-    uint32_t ss0;  // 保存 0 环栈段选择子
-    uint32_t esp1; // 保存 1 环栈指针
-    uint32_t ss1;  // 保存 1 环栈段选择子
-    uint32_t esp2; // 保存 2 环栈指针
-    uint32_t ss2;  // 保存 2 环栈段选择子
-    // 下面这些都是用来做切换寄存器值用的，切换寄存器的时候由CPU自动填写。
-    uint32_t cr3; 
-    uint32_t eip;  
-    uint32_t eflags;
-    uint32_t eax;
-    uint32_t ecx;
-    uint32_t edx;
-    uint32_t ebx;
-    uint32_t esp;
-    uint32_t ebp;
-    uint32_t esi;
-    uint32_t edi;
-    uint32_t es;
-    uint32_t cs;
-    uint32_t ss;
-    uint32_t ds;
-    uint32_t fs;
-    uint32_t gs;
-    uint32_t ldt;
-    // 这个暂时忽略
-    uint32_t io_map;
+	uint32_t link; // 保存前一个 TSS 段选择子，使用 call 指令切换寄存器的时候由CPU填写。
+	// 这 6 个值是固定不变的，用于提权，CPU 切换栈的时候用
+	uint32_t esp0; // 保存 0 环栈指针
+	uint32_t ss0;  // 保存 0 环栈段选择子
+	uint32_t esp1; // 保存 1 环栈指针
+	uint32_t ss1;  // 保存 1 环栈段选择子
+	uint32_t esp2; // 保存 2 环栈指针
+	uint32_t ss2;  // 保存 2 环栈段选择子
+	// 下面这些都是用来做切换寄存器值用的，切换寄存器的时候由CPU自动填写。
+	uint32_t cr3; 
+	uint32_t eip;  
+	uint32_t eflags;
+	uint32_t eax;
+	uint32_t ecx;
+	uint32_t edx;
+	uint32_t ebx;
+	uint32_t esp;
+	uint32_t ebp;
+	uint32_t esi;
+	uint32_t edi;
+	uint32_t es;
+	uint32_t cs;
+	uint32_t ss;
+	uint32_t ds;
+	uint32_t fs;
+	uint32_t gs;
+	uint32_t ldt;
+	// 这个暂时忽略
+	uint32_t io_map;
 } TSS;
 
 
@@ -402,7 +409,7 @@ void setup_idt()
 	}
 	
 	init_8259_pic();
-	init_clock();
+	//init_clock();
 	//
 	__asm {
 		sti

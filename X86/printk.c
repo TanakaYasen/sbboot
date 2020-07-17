@@ -412,6 +412,14 @@ static inline void putchar(char ch)
 	{
 	case '\r':
 	case '\n':
+		{
+			for (int i = m_CursorX; i < 80; i++)
+			{
+				unsigned int pos = m_CursorY * 80 + i;
+				VGABASE[pos * 2] =  0;
+				VGABASE[pos * 2 + 1] = 0x0d;
+			}
+		}
 		m_CursorY ++;
 		m_CursorX = 0;
 		break;

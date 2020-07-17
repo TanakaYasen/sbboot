@@ -7,7 +7,7 @@ romimage: file="D:\Program Files\Bochs-2.6.11/BIOS-bochs-latest", address=0x0000
 vgaromimage: file="D:\Program Files\Bochs-2.6.11/VGABIOS-lgpl-latest"
 boot: floppy
 floppy_bootsig_check: disabled=0
-floppya: type=1_44, 1_44="D:\repos\mybootloader\X86\boot-86.img", status=inserted, write_protected=1
+floppya: type=1_44, 1_44="X86\boot-86.img", status=inserted, write_protected=1
 # no floppyb
 ata0: enabled=false
 ata1: enabled=true, ioaddr1=0x170, ioaddr2=0x370, irq=15

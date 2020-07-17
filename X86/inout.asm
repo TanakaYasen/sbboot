@@ -29,7 +29,7 @@ _inb@4:
 	mov dx, [ebp+8]
 	in al, dx
 	leave
-	ret 8
+	ret 4	;this should pop 4 bytes rather than 8 bytes
 	
 global _inw@4
 _inw@4:
@@ -38,4 +38,4 @@ _inw@4:
 	mov dx, [ebp+8]
 	in ax, dx
 	leave
-	ret 8
+	ret 4
