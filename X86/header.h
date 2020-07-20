@@ -7,6 +7,7 @@ void setup_idt();
 void demo_graphics(void);
 
 void __cdecl printf(const char* format, ...);
+void vesa_information();
 
 void outb(unsigned short, unsigned char);
 void outw(unsigned short, unsigned short);

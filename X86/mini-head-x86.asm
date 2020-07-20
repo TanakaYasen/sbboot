@@ -154,6 +154,7 @@ main:
 	;ds == 0x900
 	call		disk_load_PE
 	call		probe_memory
+	call		set_vesa_model
 	
 	xor		eax, eax				;初始化数据段描述符的基地址
 	mov	eax, BASE
@@ -211,7 +212,42 @@ detect_iter:
 detect_ok:
 		ret
 
+set_vesa_model: ;;设置显卡模式
+	push es
+	push fs
+	;;设置显卡模式
+	mov ax , 0x4f02		;Set VBE mode
+	mov bx , 0x4118 ;	bit 14=Linear framebuffer
+	int 0x10
 
+	mov ax, 0x9000
+	mov es, ax
+	
+	mov ax, 0x4f00
+	mov di, 0h
+	int 0x10				;Get VBE mode; bit 14=LFB
+	
+	mov di, 0200h
+	mov cx, 0118h
+	mov ax, 0x4f01		; Get VBE mode info
+	int 0x10
+	
+	mov ax, 0x4f03
+	int 0x10				; Get current VBE; bit 14=LFB
+	
+	mov ax, 0x4f0a
+	mov bl, 0h
+	mov di, 0400h
+	int 0x10				; Return protected mode interface
+	
+	mov ax, es
+	mov ds:[0x0], cx
+	mov ds:[0x2], di
+	mov ds:[0x4], ax
+	
+	pop fs
+	pop es
+	ret
 ;#define FLOPPY_144_SECTORS_PER_TRACK 18
 ;void lba_2_chs(uint32_t lba, uint16_t* cyl, uint16_t* head, uint16_t* sector)
 ;{

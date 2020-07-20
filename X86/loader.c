@@ -21,6 +21,8 @@ typedef struct _MEM_INFO
 
 void __fastcall loader_main(const MEM_INFO *m_info)
 {
+	vesa_information();
+	
 	printf("%p\n", loader_main);
 	printf("Enter loader_main @%p\n", loader_main);
 	printf("m_info = %p\n", m_info);
