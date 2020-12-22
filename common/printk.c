@@ -1,6 +1,5 @@
 #include <stdarg.h>
-
-#include "header.h"
+#pragma warning( disable : 4244 )
 
 typedef int boolean_t;
 

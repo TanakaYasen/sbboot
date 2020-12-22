@@ -16,11 +16,11 @@ all:
 	cl.exe $(CFLAGS) -c vesa.c
 	cl.exe $(CFLAGS) -c vga.c
 	cl.exe $(CFLAGS) -c ReadHD.c
-	cl.exe $(CFLAGS) -c printk.c
+	cl.exe $(CFLAGS) -c ../common/printk.c
 	nasm.exe inout.asm -fwin32
 
 	link.exe $(LFLAGS) -entry:loader_main -base:0x100000 -map:loader.map /out:loader.exe *.obj
 	REM ndisasm -o 0x7c00 mbr.bin
-	$(BASH) concat.sh
+	..\\BUILD\\mkimg -oboot-86.img -n2880 mbr.bin=1 head.bin=2 loader.exe=16
 	del *.bin *.obj *.exe
 
