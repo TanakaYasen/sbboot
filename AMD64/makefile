@@ -1,7 +1,6 @@
 # set PATH=D:\Program Files\nasm-2.15.01;%PATH%;D:\repos\WRK1.2\tools\AMD64;
 # also MSYS env is involved.
 
-BASH = "D:\Program Files (x86)\SmartGit\git\git-bash.exe"
 ASFLAGS = -I../common
 CFLAGS = -nologo -Zl -Zp8 -Gy -cbstring -W3 -WX -GR- -GF -GS- -Gm- -Gz -Z7 -Oxs -Oy-
 LFLAGS =  -nodefaultlib -machine:x64  -driver -subsystem:native,5.02 -WX -release -version:5.2 -osversion:5.2 -IGNORE:4281
@@ -12,6 +11,7 @@ all:
 	nasm mini-head-x64.asm -o head.bin
 
 	cl.exe $(CFLAGS) -c loader.c
+	cl.exe $(CFLAGS) -c apic.c
 	cl.exe $(CFLAGS) -c ../common/printk.c
 	nasm.exe -fwin64 util.asm
 
