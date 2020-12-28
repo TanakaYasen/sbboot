@@ -12,6 +12,7 @@ all:
 
 	cl.exe $(CFLAGS) -c loader.c
 	cl.exe $(CFLAGS) -c apic.c
+	cl.exe $(CFLAGS) -c mm.c
 	cl.exe $(CFLAGS) -c ../common/printk.c
 	nasm.exe -fwin64 util.asm
 

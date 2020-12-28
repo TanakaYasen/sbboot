@@ -4,17 +4,17 @@ ULONG64 get_pte_base()
 {
     PHYSICAL_ADDRESS physical_address;
     ULONG64 pte_base = 0;
-    physical_address.QuadPart = __readcr3() & 0xfffffffffffff000;   // è·å–CR3å¯„å­˜å™¨ï¼Œæ¸…é™¤ä½12ä½
-    PULONG64 pxe_ptr = MmGetVirtualForPhysical(physical_address);   // è·å–å…¶æ‰€åœ¨çš„è™šæ‹Ÿåœ°å€ - é¡µè¡¨è‡ªæ˜ å°„
+    physical_address.QuadPart = __readcr3() & 0xfffffffffffff000;   // »ñÈ¡CR3¼Ä´æÆ÷£¬Çå³ıµÍ12Î»
+    PULONG64 pxe_ptr = MmGetVirtualForPhysical(physical_address);   // »ñÈ¡ÆäËùÔÚµÄĞéÄâµØÖ· - Ò³±í×ÔÓ³Éä
     ULONG64 index = 0;
-    // éå†æ¯”è¾ƒ
+    // ±éÀú±È½Ï
     while((pxe_ptr[index] & 0xfffffffff000) != physical_address.QuadPart) {
         index++;
         if(index >= 512) {
             return 0;
         }
     }
-    // è®¡ç®—pteåŸºå€
+    // ¼ÆËãpte»ùÖ·
     pte_base = ((index + 0x1fffe00) << 39);
  
     return pte_base;
@@ -111,19 +111,7 @@ Amd64VtoP: Mapped phys 000000006338bf68
 
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-ç»“è®ºï¼šé¡µè¡¨çš„è™šæ‹Ÿåœ°å€è·Ÿcr3æ— å…³ï¼Œåªæ˜¯ç³»ç»Ÿå®‰æ’çš„è€Œå·²
+½áÂÛ£ºÒ³±íµÄĞéÄâµØÖ·¸úcr3ÎŞ¹Ø£¬Ö»ÊÇÏµÍ³°²ÅÅµÄ¶øÒÑ
 
 */
 
@@ -131,14 +119,50 @@ Amd64VtoP: Mapped phys 000000006338bf68
 //mov cr3, 0x1000000
 
 
-#define BASE 0xFFFFF00000000000
+#include <stdint.h>
 
-void mm_setup()
+
+void __cdecl printf(const char* format, ...);
+typedef uint64_t		addr_t;
+#define BASE 		0xFFFFF00000000000
+#define PHY_BASE	0x2000
+
+static inline addr_t get_pte_of_va(addr_t va)
 {
+	return (((va&0xffffffffffff) >> 12)<<3) + 0xFFFFF68000000000;
+}
 
+
+static void set_pte(addr_t *page_va, addr_t pfn)
+{
+	addr_t val = pfn << 12;
+	val |= 0x23;
+	*page_va = val;
+}
+
+void mm_setup(void)
+{
+	addr_t *Cr3 = (addr_t*)PHY_BASE;
+	addr_t	vax = 0xFFFFF00000000000;
+	
+	Cr3[0x1ED] = (0x2<<12) | 0x23;	//self-map
+	
+	addr_t 	pte = get_pte_of_va(vax);
+	addr_t	pde = get_pte_of_va(pte);
+	addr_t	ppe = get_pte_of_va(pde);
+	addr_t	pxe = get_pte_of_va(ppe);
+	
+	printf("%p %p %p %p\n",  pxe, ppe, pde, pte);
+	
+	set_pte((addr_t *)pxe, 0x400);
+	set_pte((addr_t *)ppe, 0x401);
+	set_pte((addr_t *)pde, 0x402);
+	set_pte((addr_t *)pte, 0xfee00);
+	
+	printf("map done: %p\n", pxe);
 }
 
 void *mm_alloc()
 {
-
+	return NULL;
 }

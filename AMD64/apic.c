@@ -33,6 +33,7 @@ void APIC_test(void)
 	printf(ci.ecx &(1<< 21)?"x2APIC supported\n":"x2APIC not supported\n");
 
 	__int64 msrv = __readmsr(IA32_APIC_BASE_MSR);
+	printf("%x\n", msrv);
 #if 0
 	printf("WriteMsr to disable it\n");
 
@@ -57,7 +58,10 @@ void APIC_test(void)
 #endif
 	
 	//mapva to pa
-	uint32_t pn =(msrv>>12) & 0xfffff000;
-	unsigned __int64 cr3 = __readcr3();
-	printf("%x\n", cr3);
+	uint32_t		*p = (uint32_t *)0xFFFFF00000000000;
+	for (int i = 0; i < 0x10; i++)
+	{
+		printf("%x\n", p[i]);
+	}
+	
 }

@@ -4,6 +4,7 @@
 
 global GetCPUFamily
 global Halt
+global GetCIP
 
 GetCPUFamily:
 	push rdi
@@ -17,6 +18,10 @@ GetCPUFamily:
 	pop rdi
 	ret
 
+GetCIP:
+	mov rax, [rsp]
+	ret
+	
 Halt:
 	hlt
 	ret
