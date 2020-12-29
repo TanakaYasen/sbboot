@@ -2,25 +2,29 @@
 //https://blog.csdn.net/GerryLee93/article/details/106475013
 
 #include "../common/msrnames.h"
+#include "misc.h"
+
 #include <intrin.h>
 #include <stdint.h>
 
-void __cdecl printf(const char* format, ...);
+#define APIC_BASE	0xFFFFF00000000000
 
+typedef uint32_t ULONG;
+typedef void VOID;
 
-#define APIC_BASE_VA	0x80000
+static inline
+ULONG
+ApicRead(ULONG Offset)
+{
+    return *(volatile ULONG *)(APIC_BASE + Offset);
+}
 
+static inline
+VOID ApicWrite(ULONG Offset, ULONG Value)
+{
+    *(volatile ULONG *)(APIC_BASE + Offset) = Value;
+}
 
-typedef union CPUINFO {
-	struct
-	{
-		int cpuinfo[4];
-	};
-	struct
-	{
-		int	eax, ebx, ecx, edx;
-	};
-}CPUINFO;
 
 void APIC_test(void)
 {
@@ -58,10 +62,13 @@ void APIC_test(void)
 #endif
 	
 	//mapva to pa
-	uint32_t		*p = (uint32_t *)0xFFFFF00000000000;
-	for (int i = 0; i < 0x10; i++)
-	{
-		printf("%x\n", p[i]);
-	}
-	
+	uint32_t	*p = (uint32_t *)APIC_BASE;
+	printf("LAPIC Version Register: %x\n", p[0x30>>2]);
+	printf("Arbitration Priority Register: %x\n", p[0x90>>2]);
+	printf("Processor Priority Register: %x\n", p[0xA0>>2]);
+	printf("In-Service Register: %x\n", p[0x100>>2]);
+	printf("In-Service Register: %x\n", p[0x110>>2]);
+
+	printf("$Dbg:CIP=%p\n", GetCIP());
+	ApicWrite(0x380, 123);
 }

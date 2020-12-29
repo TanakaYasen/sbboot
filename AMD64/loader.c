@@ -1,4 +1,5 @@
 #include "../common/msrnames.h"
+#include "misc.h"
 
 #include <intrin.h>
 #include <stdint.h>
@@ -14,9 +15,6 @@ static char str[0x20];
 void GetCPUFamily(const char *out);
 void mm_setup(void);
 void APIC_test(void);
-void Halt(void);
-uint64_t GetCIP(void);
-void __cdecl printf(const char* format, ...);
 
 void __fastcall loader_main()
 {
@@ -28,9 +26,10 @@ void __fastcall loader_main()
 
 	mm_setup();
 	APIC_test();
-	
 
 	__halt();
+	
+
 	for (int i = 0; i < 16; i++)
 	{
 		x += y;

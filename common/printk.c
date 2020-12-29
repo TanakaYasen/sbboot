@@ -3,13 +3,21 @@
 
 typedef int boolean_t;
 
+#ifdef _WIN64
+typedef long long natlong_t;
+typedef unsigned long long natulong_t;
+#else
+typedef long natlong_t;
+typedef unsigned long natulong_t;
+#endif
+
 #define FALSE 0
 #define TRUE 1
 /*
  * Forward declarations
  */
 void printnum(
-	register unsigned int	u,
+	register natulong_t	u,
 	register int		base,
 	void			(*putc)(char));
 
@@ -17,11 +25,11 @@ void printnum(
 #define isdigit(d) ((d) >= '0' && (d) <= '9')
 #define Ctod(c) ((c) - '0')
 
-#define MAXBUF (sizeof(long int) * 8)		 /* enough for binary */
+#define MAXBUF (sizeof(natlong_t) * 8)		 /* enough for binary */
 
 void
 printnum(
-	register unsigned int	u,		/* number to print */
+	register natulong_t	u,		/* number to print */
 	register int		base,
 	void			(*putc)(char))
 {
@@ -52,8 +60,8 @@ _doprnt(
 	int		prec;
 	boolean_t	ladjust;
 	char		padc;
-	long		n;
-	unsigned long	u;
+	natlong_t	n;
+	natulong_t	u;
 	int		plus_sign;
 	int		sign_char;
 	boolean_t	altfmt, truncate;
@@ -147,7 +155,7 @@ _doprnt(
 		    boolean_t	  any;
 		    register int  i;
 
-		    u = va_arg(*argp, unsigned long);
+		    u = va_arg(*argp, natulong_t);
 		    p = va_arg(*argp, char *);
 		    base = *p++;
 		    printnum(u, base, putc);
@@ -178,7 +186,7 @@ _doprnt(
 			    printnum((unsigned)( (u>>(j-1)) & ((2<<(i-j))-1)),
 					base, putc);
 			}
-			else if (u & (1<<(i-1))) {
+			else if (u & (natulong_t)(1<<(i-1))) {
 			    if (any)
 				(*putc)(',');
 			    else {
@@ -303,7 +311,7 @@ _doprnt(
 		    goto print_unsigned;
 
 		print_signed:
-		    n = va_arg(*argp, long);
+		    n = va_arg(*argp, natlong_t);
 		    if (n >= 0) {
 			u = n;
 			sign_char = plus_sign;
@@ -315,7 +323,7 @@ _doprnt(
 		    goto print_num;
 
 		print_unsigned:
-		    u = va_arg(*argp, unsigned long);
+		    u = va_arg(*argp, natulong_t);
 		    goto print_num;
 
 		print_num:
@@ -325,7 +333,7 @@ _doprnt(
 		    static const char digits[] = "0123456789abcdef0123456789ABCDEF";
 		    char *prefix = 0;
 
-		    if (truncate) u = (long)((int)(u));
+		    if (truncate) u = u;
 
 		    if (u != 0 && altfmt) {
 			if (base == 8)
